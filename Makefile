@@ -447,3 +447,10 @@ indent:
 
 .PHONY: all help build install clean lib so
 
+# Fuzz target
+# run: make fuzz_target
+fuzz_target: CFLAGS += -g -fsanitize=fuzzer,undefined -O0 -fno-omit-frame-pointer
+fuzz_target: $(BUILD_DIR)/civetweb_fuzz_target.o
+
+$(BUILD_DIR)/civetweb_fuzz_target.o: src/civetweb.c | $(BUILD_DIRS)
+	$(CC) -c $(CFLAGS) $< -o $@
