@@ -1,4 +1,4 @@
-
+.cifuzz-*
 civetweb
 civetweb_test
 libcivetweb.a

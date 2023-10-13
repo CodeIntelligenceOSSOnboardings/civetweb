@@ -389,6 +389,7 @@ clean:
 	$(RMRF) lib$(CPROG).so.$(version).0
 	$(RMRF) $(CPROG)
 	$(RMF) $(UNIT_TEST_PROG)
+	$(RMF) mg_fuzzer
 
 distclean: clean
 	@$(RMRF) VS2012/Debug VS2012/*/Debug  VS2012/*/*/Debug
@@ -448,9 +449,12 @@ indent:
 .PHONY: all help build install clean lib so
 
 # Fuzz target
-# run: make fuzz_target
+# run: cifuzz run mg_fuzzer -v
 fuzz_target: CFLAGS += -g -fsanitize=fuzzer,undefined -O0 -fno-omit-frame-pointer
 fuzz_target: $(BUILD_DIR)/civetweb_fuzz_target.o
 
 $(BUILD_DIR)/civetweb_fuzz_target.o: src/civetweb.c | $(BUILD_DIRS)
 	$(CC) -c $(CFLAGS) $< -o $@
+
+mg_fuzzer: $(BUILD_DIR)/civetweb_fuzz_target.o
+	clang++ -fsanitize=fuzzer,address -I include/ fuzztest/fuzzer.cc $< -o $@
