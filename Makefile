@@ -457,4 +457,23 @@ $(BUILD_DIR)/civetweb_fuzz_target.o: src/civetweb.c | $(BUILD_DIRS)
 	$(CC) -c $(CFLAGS) $< -o $@
 
 mg_fuzzer: $(BUILD_DIR)/civetweb_fuzz_target.o
+	@echo "Custom fuzz target: fuzz base64 implementation"
 	clang++ -fsanitize=fuzzer,address -I include/ fuzztest/fuzzer.cc $< -o $@
+
+fuzz1:
+	@echo "First fuzz target: vary URI for HTTP1 server"
+	make WITH_ALL=1 TEST_FUZZ=1
+	mv civetweb fuzz1
+	# ./civetweb -max_len=2048 fuzztest/url/
+
+fuzz2:
+	@echo "Second fuzz target: vary HTTP1 request for HTTP1 server"
+	make WITH_ALL=1 TEST_FUZZ=2
+	mv civetweb fuzz2
+	#./civetweb -max_len=2048 -dict=fuzztest/http1.dict fuzztest/http1/
+
+fuzz3:
+	@echo "Third fuzz target: vary HTTP1 response for HTTP1 client API"
+	make WITH_ALL=1 TEST_FUZZ=3
+	mv civetweb fuzz3
+	#./civetweb -max_len=2048 -dict=fuzztest/http1.dict fuzztest/http1c/
