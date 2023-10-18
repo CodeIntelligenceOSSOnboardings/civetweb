@@ -450,15 +450,22 @@ indent:
 
 # Fuzz target
 # run: cifuzz run mg_fuzzer -v
-fuzz_target: CFLAGS += -g -fsanitize=fuzzer,undefined -O0 -fno-omit-frame-pointer
+fuzz_target: CFLAGS += -g -fsanitize=address,fuzzer,undefined -O0 -ggdb3 -fno-omit-frame-pointer -fsanitize-address-use-after-scope -fno-sanitize-recover=undefined
 fuzz_target: $(BUILD_DIR)/civetweb_fuzz_target.o
 
+$(BUILD_DIR)/civetweb_fuzz_target.o: CFLAGS += -DNO_SSL -DMG_EXPERIMENTAL_INTERFACES -DUSE_IPV6 -DUSE_WEBSOCKET -fPIC  -fsanitize=address,fuzzer,undefined -O0 -g -ggdb3 -fno-omit-frame-pointer -fsanitize-address-use-after-scope -fno-sanitize-recover=undefined
 $(BUILD_DIR)/civetweb_fuzz_target.o: src/civetweb.c | $(BUILD_DIRS)
 	$(CC) -c $(CFLAGS) $< -o $@
 
+mg_fuzzer: CFLAGS += -fsanitize=address,fuzzer,undefined -O0 -ggdb3 -fno-omit-frame-pointer -fsanitize-address-use-after-scope -fno-sanitize-recover=undefined
 mg_fuzzer: $(BUILD_DIR)/civetweb_fuzz_target.o
 	@echo "Custom fuzz target: fuzz base64 implementation"
-	clang++ -fsanitize=fuzzer,address -I include/ fuzztest/fuzzer.cc $< -o $@
+	clang++ $(CFLAGS) -I include/ fuzztest/fuzzer.cc $< -o $@
+
+rest_fuzzer: CFLAGS += -fsanitize=address,fuzzer,undefined -O0 -ggdb3 -fno-omit-frame-pointer -fsanitize-address-use-after-scope -fno-sanitize-recover=undefined
+rest_fuzzer: $(BUILD_DIR)/civetweb_fuzz_target.o
+	@echo "Custom fuzz target: rest fuzzer"
+	clang++ $(CFLAGS) -DNO_FILES -DMG_EXPERIMENTAL_INTERFACES -I include/ -I examples/rest/cJSON/ examples/rest/rest_fuzz.cc examples/rest/cJSON/cJSON.c examples/rest/cJSON/cJSON_Utils.c -lpthread $< -o $@
 
 fuzz1:
 	@echo "First fuzz target: vary URI for HTTP1 server"
@@ -477,3 +484,12 @@ fuzz3:
 	make WITH_ALL=1 TEST_FUZZ=3
 	mv civetweb fuzz3
 	#./civetweb -max_len=2048 -dict=fuzztest/http1.dict fuzztest/http1c/
+
+
+# Rest fuzzer
+# Build civetweb.o
+# clang -c -Wall -Wextra -Wshadow -Wformat-security -Winit-self -Wmissing-prototypes -DOSX -Iinclude -DNO_SSL -DMG_EXPERIMENTAL_INTERFACES -DUSE_STACK_SIZE=102400 -O2 -DNDEBUG -DOPENSSL_API_1_1 -DUSE_IPV6 -DUSE_WEBSOCKET -fPIC -fPIC src/civetweb.c -o out/src/civetweb.o
+#
+# Build rest_fuzzer
+# clang -fsanitize=fuzzer,address -DNO_FILES -DMG_EXPERIMENTAL_INTERFACES -I include/ -I examples/rest/cJSON/ examples/rest/rest_fuzz.c examples/rest/cJSON/cJSON.c examples/rest/cJSON/cJSON_Utils.c out/src/civetweb.o -o rest_fuzzer
+

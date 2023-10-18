@@ -13,7 +13,7 @@ SRC = rest.c cJSON/cJSON.c cJSON/cJSON_Utils.c
 TOP = ../..
 CIVETWEB_LIB = libcivetweb.a
 
-CFLAGS = -I$(TOP)/include -IcJSON $(COPT) -DNO_FILES -DMG_EXPERIMENTAL_INTERFACES
+CFLAGS = -I$(TOP)/include -IcJSON $(COPT) -DNO_FILES -DMG_EXPERIMENTAL_INTERFACES -fsanitize=address,undefined
 LIBS = -lpthread
 
 include $(TOP)/resources/Makefile.in-os
