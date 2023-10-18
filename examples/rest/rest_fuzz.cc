@@ -14,8 +14,8 @@
 
 #include "cJSON.h"
 #include "civetweb.h"
-#include <assert.h>
-#include <cifuzz/cifuzz.h>
+// #include <assert.h>
+// #include <cifuzz/cifuzz.h>
 #include <fuzzer/FuzzedDataProvider.h>
 
 // Constants
@@ -278,9 +278,8 @@ log_message(const struct mg_connection *conn, const char *message)
 struct mg_callbacks callbacks;
 struct mg_context *ctx;
 
-// extern "C" int
-// LLVMFuzzerInitialize(int *argc, char ***argv)
-FUZZ_TEST_SETUP()
+int
+one_time_setup()
 {
 	const char *options[] = {"listening_ports",
 	                         PORT,
@@ -289,8 +288,6 @@ FUZZ_TEST_SETUP()
 	                         "error_log_file",
 	                         "error.log",
 	                         0};
-
-	int err = 0;
 
 	/* Init libcivetweb. */
 	mg_init_library(0);
@@ -305,8 +302,8 @@ FUZZ_TEST_SETUP()
 	/* Check return value: */
 	if (ctx == NULL) {
 		fprintf(stderr, "Cannot start CivetWeb - mg_start failed.\n");
-		// return EXIT_FAILURE;
-		return;
+		return EXIT_FAILURE;
+		// return;
 	}
 
 	/* Add handler EXAMPLE_URI, to explain the example */
@@ -318,20 +315,25 @@ FUZZ_TEST_SETUP()
 	printf("Start example: %s%s\n", HOST_INFO, EXAMPLE_URI);
 	printf("Fuzz example: %s%s\n", HOST_INFO, EXAMPLE_FUZZ);
 	printf("Exit example:  %s%s\n", HOST_INFO, EXIT_URI);
-	// return 0;
-	return;
+	return 0;
+	// return;
 }
 
-// extern "C" int
-// LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
-FUZZ_TEST(const uint8_t *data, size_t size)
+extern "C" int
+LLVMFuzzerInitialize(int *argc, char ***argv)
+// FUZZ_TEST_SETUP()
+{
+	return one_time_setup();
+}
+
+extern "C" int
+LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
+// FUZZ_TEST(const uint8_t *data, size_t size)
 {
 
 	int err = false;
 	if (err) {
-		// TODO:
-		// LLVMFuzzerInitialize(nullptr, nullptr);
-		// FUZZ_TEST_SETUP();
+		one_time_setup();
 	}
 
 	FuzzedDataProvider fuzzed_data(data, size);
@@ -343,8 +345,8 @@ FUZZ_TEST(const uint8_t *data, size_t size)
 	if (cli == NULL) {
 		fprintf(stderr, "Cannot connect client: %s\n", errbuf);
 		err = true;
-		// return EXIT_FAILURE;
-		return;
+		return EXIT_FAILURE;
+		// return;
 	}
 
 	std::string method =
@@ -360,5 +362,5 @@ FUZZ_TEST(const uint8_t *data, size_t size)
 	mg_get_response(cli, errbuf, sizeof(errbuf), 10000);
 	// std::this_thread::sleep_for(std::chrono::milliseconds(30));
 	mg_close_connection(cli);
-	// return EXIT_SUCCESS;
+	return EXIT_SUCCESS;
 }

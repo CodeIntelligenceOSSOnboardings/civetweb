@@ -467,7 +467,7 @@ mg_fuzzer: $(BUILD_DIR)/civetweb_fuzz_target.o
 rest_fuzzer: CFLAGS += -fsanitize=address,fuzzer,undefined -O0 -ggdb3 -fno-omit-frame-pointer -fsanitize-address-use-after-scope -fno-sanitize-recover=undefined
 rest_fuzzer: $(BUILD_DIR)/civetweb_fuzz_target.o
 	@echo "Custom fuzz target: rest fuzzer"
-	clang++ $(CFLAGS) -DNO_FILES -DMG_EXPERIMENTAL_INTERFACES -I include/ -I examples/rest/cJSON/ examples/rest/rest_fuzz.cc examples/rest/cJSON/cJSON.c examples/rest/cJSON/cJSON_Utils.c -lpthread ${CXX} ${CXXFLAGS} ${FUZZ_TEST_CXXFLAGS} ${FUZZ_TEST_LDFLAGS} $< -o $@
+	clang++ $(CFLAGS) -DNO_FILES -DMG_EXPERIMENTAL_INTERFACES -I include/ -I examples/rest/cJSON/ examples/rest/rest_fuzz.cc examples/rest/cJSON/cJSON.c examples/rest/cJSON/cJSON_Utils.c -lpthread $< -o $@
 
 fuzz1:
 	@echo "First fuzz target: vary URI for HTTP1 server"
