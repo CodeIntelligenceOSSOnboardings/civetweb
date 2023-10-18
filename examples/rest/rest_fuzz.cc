@@ -14,6 +14,8 @@
 
 #include "cJSON.h"
 #include "civetweb.h"
+#include <assert.h>
+#include <cifuzz/cifuzz.h>
 #include <fuzzer/FuzzedDataProvider.h>
 
 // Constants
@@ -152,58 +154,9 @@ ExamplePUT(struct mg_connection *conn, const char *p1, const char *p2)
 	return 201;
 }
 
-
-#if 0 /* Old version: User code had to split the url. */
-static int
-mg_vsplit(const char *url, const char *pattern, va_list va)
-{
-	int ret = 0;
-	while (*url && *pattern) {
-		if (*url == *pattern) {
-			url++;
-			pattern++;
-		} else if (*pattern == '*') {
-			char *p = va_arg(va, char *);
-			size_t l = va_arg(va, size_t);
-			if (p == NULL || l == 0) {
-				return 0;
-			}
-			while ((*url != '/') && (*url != 0)) {
-				if (l == 0) {
-					return 0;
-				}
-				l--;
-				*p = *url;
-				p++;
-				url++;
-			}
-			*p = 0;
-			pattern++;
-			ret++;
-		} else {
-			return 0;
-		}
-	}
-	return ret;
-}
-
-
-static int
-mg_split(const char *url, const char *pattern, ...)
-{
-	int ret;
-	va_list va;
-	va_start(va, pattern);
-	ret = mg_vsplit(url, pattern, va);
-	va_end(va);
-	return ret;
-}
-#endif
-
 static int
 FuzzHandler(struct mg_connection *conn, void *cbdata)
 {
-	// void(cbdata); // unused
 	char path1[1024], path2[1024];
 	const struct mg_request_info *ri = mg_get_request_info(conn);
 	struct mg_match_context mcx;
@@ -221,7 +174,7 @@ FuzzHandler(struct mg_connection *conn, void *cbdata)
 
 	if (0 == strcmp(ri->request_method, "GET")) {
 		//  Vulnerability simulation for the specific query 'q=fuzz'
-		if (ri->query_string && strncmp(ri->query_string, "q=fuzz", 3) == 0) {
+		if (ri->query_string && strncmp(ri->query_string, "q=fuzz", 6) == 0) {
 			char buffer[64]; // This is a small local buffer
 
 			// Vulnerability: We are copying the entire query_string into the
@@ -231,7 +184,8 @@ FuzzHandler(struct mg_connection *conn, void *cbdata)
 			mg_send_http_ok(conn, "text/plain", strlen(buffer));
 			mg_write(conn, buffer, strlen(buffer));
 
-			return ExampleGET(conn, path1, path2);
+			// return ExampleGET(conn, path1, path2);
+			return 200;
 		}
 	} else if ((0 == strcmp(ri->request_method, "PUT"))
 	           || (0 == strcmp(ri->request_method, "POST"))
@@ -260,14 +214,6 @@ ExampleHandler(struct mg_connection *conn, void *cbdata)
 	size_t url_len = strlen(url);
 
 	/* Pattern matching */
-#if 0 /* Old version: User code had to split the url. */
-	if (2
-	    != mg_split(
-	           url, EXAMPLE_URI, path1, sizeof(path1), path2, sizeof(path2))) {
-		mg_send_http_error(conn, 404, "Invalid path: %s\n", url);
-		return 404;
-	}
-#else /* New version: User mg_match. */
 	struct mg_match_context mcx;
 	mcx.case_sensitive = 0;
 	ptrdiff_t ret = mg_match(EXAMPLE_URI, url, &mcx);
@@ -284,7 +230,6 @@ ExampleHandler(struct mg_connection *conn, void *cbdata)
 	path1[mcx.match[0].len] = 0;
 	memcpy(path2, mcx.match[1].str, mcx.match[1].len);
 	path2[mcx.match[1].len] = 0;
-#endif
 
 
 	(void)cbdata; /* currently unused */
@@ -333,8 +278,9 @@ log_message(const struct mg_connection *conn, const char *message)
 struct mg_callbacks callbacks;
 struct mg_context *ctx;
 
-extern "C" int
-LLVMFuzzerInitialize(int *argc, char ***argv)
+// extern "C" int
+// LLVMFuzzerInitialize(int *argc, char ***argv)
+FUZZ_TEST_SETUP()
 {
 	const char *options[] = {"listening_ports",
 	                         PORT,
@@ -359,7 +305,8 @@ LLVMFuzzerInitialize(int *argc, char ***argv)
 	/* Check return value: */
 	if (ctx == NULL) {
 		fprintf(stderr, "Cannot start CivetWeb - mg_start failed.\n");
-		return EXIT_FAILURE;
+		// return EXIT_FAILURE;
+		return;
 	}
 
 	/* Add handler EXAMPLE_URI, to explain the example */
@@ -371,21 +318,24 @@ LLVMFuzzerInitialize(int *argc, char ***argv)
 	printf("Start example: %s%s\n", HOST_INFO, EXAMPLE_URI);
 	printf("Fuzz example: %s%s\n", HOST_INFO, EXAMPLE_FUZZ);
 	printf("Exit example:  %s%s\n", HOST_INFO, EXIT_URI);
-	return 0;
+	// return 0;
+	return;
 }
 
-extern "C" int
-LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
+// extern "C" int
+// LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
+FUZZ_TEST(const uint8_t *data, size_t size)
 {
 
 	int err = false;
 	if (err) {
-		LLVMFuzzerInitialize(nullptr, nullptr);
+		// TODO:
+		// LLVMFuzzerInitialize(nullptr, nullptr);
+		// FUZZ_TEST_SETUP();
 	}
 
 	FuzzedDataProvider fuzzed_data(data, size);
 
-	struct mg_client_options opt = {0};
 	char errbuf[256] = {0};
 	struct mg_connection *cli =
 	    mg_connect_client(HOST, atoi(PORT), 0, errbuf, sizeof(errbuf));
@@ -393,7 +343,8 @@ LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 	if (cli == NULL) {
 		fprintf(stderr, "Cannot connect client: %s\n", errbuf);
 		err = true;
-		return EXIT_FAILURE;
+		// return EXIT_FAILURE;
+		return;
 	}
 
 	std::string method =
@@ -403,11 +354,11 @@ LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 	          "GET",
 	          EXAMPLE_FUZZ,
 	          fuzzed_data.ConsumeRemainingBytesAsString().c_str());
-	mg_printf(cli, "Host: %s\r\n", opt.host);
+	mg_printf(cli, "Host: %s\r\n", HOST);
 	mg_printf(cli, "Connection: close\r\n\r\n");
 
 	mg_get_response(cli, errbuf, sizeof(errbuf), 10000);
 	// std::this_thread::sleep_for(std::chrono::milliseconds(30));
 	mg_close_connection(cli);
-	return EXIT_SUCCESS;
+	// return EXIT_SUCCESS;
 }

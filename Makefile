@@ -236,6 +236,8 @@ ifdef CRYPTO_LIB
   CFLAGS += -DCRYPTO_LIB=\"$(CRYPTO_LIB)\"
 endif
 
+CFLAFS += -Wno-deprecated -Wno-unused-variable
+
 BUILD_DIRS += $(addprefix $(BUILD_DIR)/, $(SOURCE_DIRS))
 BUILD_OBJECTS = $(addprefix $(BUILD_DIR)/, $(OBJECTS))
 MAIN_OBJECTS = $(addprefix $(BUILD_DIR)/, $(APP_SOURCES:.c=.o))
@@ -453,7 +455,7 @@ indent:
 fuzz_target: CFLAGS += -g -fsanitize=address,fuzzer,undefined -O0 -ggdb3 -fno-omit-frame-pointer -fsanitize-address-use-after-scope -fno-sanitize-recover=undefined
 fuzz_target: $(BUILD_DIR)/civetweb_fuzz_target.o
 
-$(BUILD_DIR)/civetweb_fuzz_target.o: CFLAGS += -DNO_SSL -DMG_EXPERIMENTAL_INTERFACES -DUSE_IPV6 -DUSE_WEBSOCKET -fPIC  -fsanitize=address,fuzzer,undefined -O0 -g -ggdb3 -fno-omit-frame-pointer -fsanitize-address-use-after-scope -fno-sanitize-recover=undefined
+$(BUILD_DIR)/civetweb_fuzz_target.o: CFLAGS += -DNO_SSL -DMG_EXPERIMENTAL_INTERFACES -DUSE_IPV6 -DUSE_WEBSOCKET -fPIC  -fsanitize=address,fuzzer,undefined -O0 -g -ggdb3 -fno-omit-frame-pointer -fsanitize-address-use-after-scope -fno-sanitize-recover=undefined 
 $(BUILD_DIR)/civetweb_fuzz_target.o: src/civetweb.c | $(BUILD_DIRS)
 	$(CC) -c $(CFLAGS) $< -o $@
 
@@ -465,7 +467,7 @@ mg_fuzzer: $(BUILD_DIR)/civetweb_fuzz_target.o
 rest_fuzzer: CFLAGS += -fsanitize=address,fuzzer,undefined -O0 -ggdb3 -fno-omit-frame-pointer -fsanitize-address-use-after-scope -fno-sanitize-recover=undefined
 rest_fuzzer: $(BUILD_DIR)/civetweb_fuzz_target.o
 	@echo "Custom fuzz target: rest fuzzer"
-	clang++ $(CFLAGS) -DNO_FILES -DMG_EXPERIMENTAL_INTERFACES -I include/ -I examples/rest/cJSON/ examples/rest/rest_fuzz.cc examples/rest/cJSON/cJSON.c examples/rest/cJSON/cJSON_Utils.c -lpthread $< -o $@
+	clang++ $(CFLAGS) -DNO_FILES -DMG_EXPERIMENTAL_INTERFACES -I include/ -I examples/rest/cJSON/ examples/rest/rest_fuzz.cc examples/rest/cJSON/cJSON.c examples/rest/cJSON/cJSON_Utils.c -lpthread ${CXX} ${CXXFLAGS} ${FUZZ_TEST_CXXFLAGS} ${FUZZ_TEST_LDFLAGS} $< -o $@
 
 fuzz1:
 	@echo "First fuzz target: vary URI for HTTP1 server"
