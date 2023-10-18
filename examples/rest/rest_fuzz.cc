@@ -1,32 +1,45 @@
+// Includes section
 #ifdef _WIN32
 #include <windows.h>
 #else
 #include <unistd.h>
 #endif
 
+#include <chrono>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+#include <thread>
 #include <time.h>
 
 #include "cJSON.h"
 #include "civetweb.h"
-#include <chrono>
 #include <fuzzer/FuzzedDataProvider.h>
-#include <thread>
 
+// Constants
 #define PORT "8089"
 #define HOST_INFO "http://localhost:8089"
-
 #define EXAMPLE_URI "/res/*/*"
 #define EXAMPLE_FUZZ "/fuzz"
 #define EXIT_URI "/exit"
-
 #define HOST "localhost"
 
+// Global variables
 int exitNow = 0;
+static unsigned request = 0; // Demo data: request counter
 
-static uint64_t call_count = 0;
+// Forward declarations
+static int SendJSON(struct mg_connection *conn, cJSON *json_obj);
+static int
+ExampleGET(struct mg_connection *conn, const char *p1, const char *p2);
+static int
+ExampleDELETE(struct mg_connection *conn, const char *p1, const char *p2);
+static int
+ExamplePUT(struct mg_connection *conn, const char *p1, const char *p2);
+static int FuzzHandler(struct mg_connection *conn, void *cbdata);
+static int ExampleHandler(struct mg_connection *conn, void *cbdata);
+static int ExitHandler(struct mg_connection *conn, void *cbdata);
+static int log_message(const struct mg_connection *conn, const char *message);
 
 
 static int
@@ -50,9 +63,6 @@ SendJSON(struct mg_connection *conn, cJSON *json_obj)
 
 	return (int)json_str_len;
 }
-
-
-static unsigned request = 0; /* demo data: request counter */
 
 
 static int
@@ -193,7 +203,7 @@ mg_split(const char *url, const char *pattern, ...)
 static int
 FuzzHandler(struct mg_connection *conn, void *cbdata)
 {
-	void(cbdata); // unused
+	// void(cbdata); // unused
 	char path1[1024], path2[1024];
 	const struct mg_request_info *ri = mg_get_request_info(conn);
 	struct mg_match_context mcx;
@@ -261,7 +271,7 @@ ExampleHandler(struct mg_connection *conn, void *cbdata)
 	struct mg_match_context mcx;
 	mcx.case_sensitive = 0;
 	ptrdiff_t ret = mg_match(EXAMPLE_URI, url, &mcx);
-	if ((ret != url_len) || (mcx.num_matches != 2)) {
+	if (((unsigned long)ret != url_len) || (mcx.num_matches != 2)) {
 		/* Note: Could have done this with a $ at the end of the match
 		 * pattern as well. Then we would have to check for a return value
 		 * of -1 only. Here we use this version as minimum modification
@@ -322,6 +332,7 @@ log_message(const struct mg_connection *conn, const char *message)
 
 struct mg_callbacks callbacks;
 struct mg_context *ctx;
+
 extern "C" int
 LLVMFuzzerInitialize(int *argc, char ***argv)
 {
@@ -344,7 +355,6 @@ LLVMFuzzerInitialize(int *argc, char ***argv)
 
 	/* Start CivetWeb web server */
 	ctx = mg_start(&callbacks, 0, options);
-
 
 	/* Check return value: */
 	if (ctx == NULL) {
@@ -396,7 +406,7 @@ LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 	mg_printf(cli, "Host: %s\r\n", opt.host);
 	mg_printf(cli, "Connection: close\r\n\r\n");
 
-	int ret = mg_get_response(cli, errbuf, sizeof(errbuf), 10000);
+	mg_get_response(cli, errbuf, sizeof(errbuf), 10000);
 	// std::this_thread::sleep_for(std::chrono::milliseconds(30));
 	mg_close_connection(cli);
 	return EXIT_SUCCESS;
