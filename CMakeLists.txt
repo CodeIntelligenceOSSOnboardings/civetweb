@@ -1,12 +1,11 @@
 # Use at least CMake 3.3
-cmake_minimum_required (VERSION 3.3.0)
-cmake_policy(VERSION 3.2.2)
-cmake_policy(SET CMP0054 NEW)
-cmake_policy(SET CMP0057 NEW)
+cmake_minimum_required (VERSION 3.16)
 
 # Set up the project
 project (civetweb)
 
+#find_package(cifuzz NO_SYSTEM_ENVIRONMENT_PATH)
+#enable_fuzz_testing()
 # Detect the platform reliably
 if(ZEPHYR_BASE)
     if (NOT CONFIG_CIVETWEB)
@@ -687,3 +686,46 @@ set(CPACK_DEBIAN_PACKAGE_DEPENDS "${CPACK_PACKAGE_DEPENDS}")
 # Finalize CPack settings
 include(CPack)
 
+
+
+# Fuzzing target
+option(CIVETWEB_ENABLE_FUZZING "Enable building of the fuzzing executable" ON)
+if (CIVETWEB_ENABLE_FUZZING)
+    # Compile civetweb.c as a separate object file
+    add_library(civetweb_fuzz_target OBJECT src/civetweb.c)
+    target_include_directories(civetweb_fuzz_target PRIVATE include/)
+    target_compile_definitions(civetweb_fuzz_target PRIVATE NO_SSL MG_EXPERIMENTAL_INTERFACES USE_IPV6 USE_WEBSOCKET NO_FILES)
+    target_compile_options(civetweb_fuzz_target PRIVATE
+        -g
+        -fsanitize=address,fuzzer,undefined
+        -O0
+        -ggdb3
+        -fno-omit-frame-pointer
+        -fsanitize-address-use-after-scope
+        -fno-sanitize-recover=undefined
+    )
+
+    # Create the rest_fuzzer executable
+
+    add_executable(rest_fuzzer
+    #add_fuzz_test(rest_fuzzer
+        examples/rest/rest_fuzz.cc
+        examples/rest/cJSON/cJSON.c
+        examples/rest/cJSON/cJSON_Utils.c
+        $<TARGET_OBJECTS:civetweb_fuzz_target>  # Include the object file
+    )
+    target_include_directories(rest_fuzzer PRIVATE examples/rest/cJSON)
+    target_include_directories(rest_fuzzer PRIVATE include/)
+    target_link_libraries(rest_fuzzer pthread)
+    target_link_libraries(rest_fuzzer ${CIVETWEB_LIBRARIES} -fsanitize=address,fuzzer,undefined)
+    target_compile_definitions(rest_fuzzer PRIVATE NO_SSL MG_EXPERIMENTAL_INTERFACES USE_IPV6 USE_WEBSOCKET NO_FILES)
+    target_compile_options(rest_fuzzer PRIVATE
+        -g
+        -fsanitize=address,fuzzer,undefined
+        -O0
+        -ggdb3
+        -fno-omit-frame-pointer
+        -fsanitize-address-use-after-scope
+        -fno-sanitize-recover=undefined
+    )
+endif()
