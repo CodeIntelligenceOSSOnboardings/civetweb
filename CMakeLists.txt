@@ -4,8 +4,9 @@ cmake_minimum_required (VERSION 3.16)
 # Set up the project
 project (civetweb)
 
-#find_package(cifuzz NO_SYSTEM_ENVIRONMENT_PATH)
-#enable_fuzz_testing()
+find_package(cifuzz NO_SYSTEM_ENVIRONMENT_PATH)
+enable_fuzz_testing()
+
 # Detect the platform reliably
 if(ZEPHYR_BASE)
     if (NOT CONFIG_CIVETWEB)
@@ -405,6 +406,8 @@ if (CIVETWEB_ENABLE_CXX)
   add_cxx_compiler_flag(--coverage COVERAGE)
 endif()
 
+add_c_compiler_flag(-Wno-strict-prototypes)
+
 if (NOT ZEPHYR)
   #Warnings: enable everything
   add_c_compiler_flag(-Wall)
@@ -696,36 +699,23 @@ if (CIVETWEB_ENABLE_FUZZING)
     target_include_directories(civetweb_fuzz_target PRIVATE include/)
     target_compile_definitions(civetweb_fuzz_target PRIVATE NO_SSL MG_EXPERIMENTAL_INTERFACES USE_IPV6 USE_WEBSOCKET NO_FILES)
     target_compile_options(civetweb_fuzz_target PRIVATE
-        -g
         -fsanitize=address,fuzzer,undefined
-        -O0
-        -ggdb3
         -fno-omit-frame-pointer
         -fsanitize-address-use-after-scope
         -fno-sanitize-recover=undefined
     )
 
     # Create the rest_fuzzer executable
-
-    add_executable(rest_fuzzer
-    #add_fuzz_test(rest_fuzzer
+    add_fuzz_test(rest_fuzzer
         examples/rest/rest_fuzz.cc
         examples/rest/cJSON/cJSON.c
         examples/rest/cJSON/cJSON_Utils.c
         $<TARGET_OBJECTS:civetweb_fuzz_target>  # Include the object file
     )
+  
     target_include_directories(rest_fuzzer PRIVATE examples/rest/cJSON)
     target_include_directories(rest_fuzzer PRIVATE include/)
     target_link_libraries(rest_fuzzer pthread)
     target_link_libraries(rest_fuzzer ${CIVETWEB_LIBRARIES} -fsanitize=address,fuzzer,undefined)
     target_compile_definitions(rest_fuzzer PRIVATE NO_SSL MG_EXPERIMENTAL_INTERFACES USE_IPV6 USE_WEBSOCKET NO_FILES)
-    target_compile_options(rest_fuzzer PRIVATE
-        -g
-        -fsanitize=address,fuzzer,undefined
-        -O0
-        -ggdb3
-        -fno-omit-frame-pointer
-        -fsanitize-address-use-after-scope
-        -fno-sanitize-recover=undefined
-    )
 endif()

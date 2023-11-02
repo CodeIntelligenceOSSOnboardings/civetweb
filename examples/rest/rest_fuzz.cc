@@ -14,8 +14,8 @@
 
 #include "cJSON.h"
 #include "civetweb.h"
-// #include <assert.h>
-// #include <cifuzz/cifuzz.h>
+#include <assert.h>
+#include <cifuzz/cifuzz.h>
 #include <fuzzer/FuzzedDataProvider.h>
 
 // Constants
@@ -172,6 +172,7 @@ FuzzHandler(struct mg_connection *conn, void *cbdata)
 		return 404;
 	}
 
+	// NOTE: BUG entry point
 	if (0 == strcmp(ri->request_method, "GET")) {
 		//  Vulnerability simulation for the specific query 'q=fuzz'
 		if (ri->query_string && strncmp(ri->query_string, "q=fuzz", 6) == 0) {
@@ -303,7 +304,6 @@ one_time_setup()
 	if (ctx == NULL) {
 		fprintf(stderr, "Cannot start CivetWeb - mg_start failed.\n");
 		return EXIT_FAILURE;
-		// return;
 	}
 
 	/* Add handler EXAMPLE_URI, to explain the example */
@@ -316,19 +316,14 @@ one_time_setup()
 	printf("Fuzz example: %s%s\n", HOST_INFO, EXAMPLE_FUZZ);
 	printf("Exit example:  %s%s\n", HOST_INFO, EXIT_URI);
 	return 0;
-	// return;
 }
 
-extern "C" int
-LLVMFuzzerInitialize(int *argc, char ***argv)
-// FUZZ_TEST_SETUP()
+FUZZ_TEST_SETUP()
 {
-	return one_time_setup();
+	one_time_setup();
 }
 
-extern "C" int
-LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
-// FUZZ_TEST(const uint8_t *data, size_t size)
+FUZZ_TEST(const uint8_t *data, size_t size)
 {
 
 	int err = false;
@@ -339,18 +334,22 @@ LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 	FuzzedDataProvider fuzzed_data(data, size);
 
 	char errbuf[256] = {0};
+	// NOTE: HOST and PORT could also be build from the FDP in a more
+	// sophisticated fuzz harness
 	struct mg_connection *cli =
 	    mg_connect_client(HOST, atoi(PORT), 0, errbuf, sizeof(errbuf));
 
 	if (cli == NULL) {
 		fprintf(stderr, "Cannot connect client: %s\n", errbuf);
 		err = true;
-		return EXIT_FAILURE;
-		// return;
+		return;
 	}
 
 	std::string method =
 	    fuzzed_data.PickValueInArray({"GET", "POST", "PUT", "DELETE"});
+	// NOTE: Instead of only polling the `EXAMPLE_FUZZ` endpoint we could
+	// also build these endpoints by random or pick from a list of known good
+	// ones!
 	mg_printf(cli,
 	          "%s %s?q=%s HTTP/1.1\r\n",
 	          "GET",
@@ -362,5 +361,5 @@ LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 	mg_get_response(cli, errbuf, sizeof(errbuf), 10000);
 	// std::this_thread::sleep_for(std::chrono::milliseconds(30));
 	mg_close_connection(cli);
-	return EXIT_SUCCESS;
+	return;
 }
