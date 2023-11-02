@@ -174,8 +174,14 @@ FuzzHandler(struct mg_connection *conn, void *cbdata)
 
 	// NOTE: BUG entry point
 	if (0 == strcmp(ri->request_method, "GET")) {
+
+		if (!ri->query_string) {
+			mg_send_http_error(conn, 400, "No query string");
+			return 400;
+		}
+		printf("Query string: %s\n", ri->query_string);
 		//  Vulnerability simulation for the specific query 'q=fuzz'
-		if (ri->query_string && strncmp(ri->query_string, "q=fuzz", 6) == 0) {
+		if (strncmp(ri->query_string, "q=fuzz", 6) == 0) {
 			char buffer[64]; // This is a small local buffer
 
 			// Vulnerability: We are copying the entire query_string into the
@@ -285,7 +291,7 @@ one_time_setup()
 	const char *options[] = {"listening_ports",
 	                         PORT,
 	                         "request_timeout_ms",
-	                         "10000",
+	                         "100000",
 	                         "error_log_file",
 	                         "error.log",
 	                         0};
@@ -294,8 +300,8 @@ one_time_setup()
 	mg_init_library(0);
 
 	/* Callback will print error messages to console */
-	memset(&callbacks, 0, sizeof(callbacks));
-	callbacks.log_message = log_message;
+	// memset(&callbacks, 0, sizeof(callbacks));
+	// callbacks.log_message = log_message;
 
 	/* Start CivetWeb web server */
 	ctx = mg_start(&callbacks, 0, options);
@@ -326,9 +332,10 @@ FUZZ_TEST_SETUP()
 FUZZ_TEST(const uint8_t *data, size_t size)
 {
 
+	mg_set_request_handler(ctx, EXAMPLE_FUZZ, FuzzHandler, 0);
 	int err = false;
 	if (err) {
-		one_time_setup();
+		err = false;
 	}
 
 	FuzzedDataProvider fuzzed_data(data, size);
@@ -352,14 +359,13 @@ FUZZ_TEST(const uint8_t *data, size_t size)
 	// ones!
 	mg_printf(cli,
 	          "%s %s?q=%s HTTP/1.1\r\n",
-	          "GET",
+	          method.c_str(),
 	          EXAMPLE_FUZZ,
 	          fuzzed_data.ConsumeRemainingBytesAsString().c_str());
 	mg_printf(cli, "Host: %s\r\n", HOST);
 	mg_printf(cli, "Connection: close\r\n\r\n");
 
-	mg_get_response(cli, errbuf, sizeof(errbuf), 10000);
-	// std::this_thread::sleep_for(std::chrono::milliseconds(30));
+	mg_get_response(cli, errbuf, sizeof(errbuf), -1);
 	mg_close_connection(cli);
 	return;
 }

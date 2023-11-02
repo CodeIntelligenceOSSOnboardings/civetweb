@@ -97,7 +97,7 @@ option(CIVETWEB_ENABLE_MEMORY_DEBUGGING "Enable the memory debugging features" O
 message(STATUS "Memory Debugging - ${CIVETWEB_ENABLE_MEMORY_DEBUGGING}")
 
 # ASAN in debug mode (-fsanitize=address, etc)
-option(CIVETWEB_ENABLE_ASAN "Enable ASAN in debug mode" ON)
+option(CIVETWEB_ENABLE_ASAN "Enable ASAN in debug mode" OFF)
 message(STATUS "ASAN in debug mode - ${CIVETWEB_ENABLE_ASAN}")
 
 # ARCH flag
@@ -692,30 +692,26 @@ include(CPack)
 
 
 # Fuzzing target
-option(CIVETWEB_ENABLE_FUZZING "Enable building of the fuzzing executable" ON)
-if (CIVETWEB_ENABLE_FUZZING)
-    # Compile civetweb.c as a separate object file
-    add_library(civetweb_fuzz_target OBJECT src/civetweb.c)
-    target_include_directories(civetweb_fuzz_target PRIVATE include/)
-    target_compile_definitions(civetweb_fuzz_target PRIVATE NO_SSL MG_EXPERIMENTAL_INTERFACES USE_IPV6 USE_WEBSOCKET NO_FILES)
-    target_compile_options(civetweb_fuzz_target PRIVATE
-        -fsanitize=address,fuzzer,undefined
-        -fno-omit-frame-pointer
-        -fsanitize-address-use-after-scope
-        -fno-sanitize-recover=undefined
-    )
+# Compile civetweb.c as a separate object file
+#add_library(civetweb_fuzz_target OBJECT src/civetweb.c)
+#target_include_directories(civetweb_fuzz_target PRIVATE include/)
+#target_compile_definitions(civetweb_fuzz_target PRIVATE NO_SSL MG_EXPERIMENTAL_INTERFACES NO_FILES)
+# NOTE: This below was necessary for the raw cmake integration
+#target_compile_options(civetweb_fuzz_target PRIVATE
+#    -fsanitize=address,fuzzer,undefined
+#    -fno-omit-frame-pointer
+#    -fsanitize-address-use-after-scope
+#    -fno-sanitize-recover=undefined
+#)
 
-    # Create the rest_fuzzer executable
-    add_fuzz_test(rest_fuzzer
-        examples/rest/rest_fuzz.cc
-        examples/rest/cJSON/cJSON.c
-        examples/rest/cJSON/cJSON_Utils.c
-        $<TARGET_OBJECTS:civetweb_fuzz_target>  # Include the object file
-    )
-  
-    target_include_directories(rest_fuzzer PRIVATE examples/rest/cJSON)
-    target_include_directories(rest_fuzzer PRIVATE include/)
-    target_link_libraries(rest_fuzzer pthread)
-    target_link_libraries(rest_fuzzer ${CIVETWEB_LIBRARIES} -fsanitize=address,fuzzer,undefined)
-    target_compile_definitions(rest_fuzzer PRIVATE NO_SSL MG_EXPERIMENTAL_INTERFACES USE_IPV6 USE_WEBSOCKET NO_FILES)
-endif()
+# Create the rest_fuzzer executable
+add_fuzz_test(rest_fuzzer
+    examples/rest/rest_fuzz.cc
+    examples/rest/cJSON/cJSON.c
+    examples/rest/cJSON/cJSON_Utils.c
+    src/civetweb.c
+)
+
+target_include_directories(rest_fuzzer PRIVATE examples/rest/cJSON)
+target_include_directories(rest_fuzzer PRIVATE include/)
+target_compile_definitions(rest_fuzzer PRIVATE MG_EXPERIMENTAL_INTERFACES NO_SSL NO_FILES)
