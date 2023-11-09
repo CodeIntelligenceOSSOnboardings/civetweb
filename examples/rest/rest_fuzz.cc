@@ -5,11 +5,9 @@
 #include <unistd.h>
 #endif
 
-#include <chrono>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
-#include <thread>
 #include <time.h>
 
 #include "cJSON.h"
@@ -173,16 +171,19 @@ FuzzHandler(struct mg_connection *conn, void *cbdata)
 	}
 
 	// NOTE: BUG entry point
-	if (0 == strcmp(ri->request_method, "GET")) {
+	if (strcmp(ri->request_method, "GET") == 0) {
 
 		if (!ri->query_string) {
 			mg_send_http_error(conn, 400, "No query string");
 			return 400;
+		} else if (strlen(ri->query_string) < 2) {
+			mg_send_http_error(conn, 400, "Query string too short");
+			return 400;
 		}
-		printf("Query string: %s\n", ri->query_string);
-		//  Vulnerability simulation for the specific query 'q=fuzz'
-		if (strncmp(ri->query_string, "q=fuzz", 6) == 0) {
-			char buffer[64]; // This is a small local buffer
+		fprintf(stderr, "Query string: %s\n", ri->query_string);
+		//   Vulnerability simulation for the specific query 'q=fuzz'
+		if (strncmp(ri->query_string, "q=fu", 4) == 0) {
+			char buffer[32]; // This is a small local buffer
 
 			// Vulnerability: We are copying the entire query_string into the
 			// local buffer without checking its length
@@ -190,10 +191,14 @@ FuzzHandler(struct mg_connection *conn, void *cbdata)
 
 			mg_send_http_ok(conn, "text/plain", strlen(buffer));
 			mg_write(conn, buffer, strlen(buffer));
-
 			// return ExampleGET(conn, path1, path2);
 			return 200;
 		}
+		mg_send_http_error(conn,
+		                   400,
+		                   "Invalid query string: %s\n",
+		                   ri->query_string);
+		return 400;
 	} else if ((0 == strcmp(ri->request_method, "PUT"))
 	           || (0 == strcmp(ri->request_method, "POST"))
 	           || (0 == strcmp(ri->request_method, "PATCH"))) {
@@ -324,18 +329,21 @@ one_time_setup()
 	return 0;
 }
 
-FUZZ_TEST_SETUP()
-{
-	one_time_setup();
-}
+// FUZZ_TEST_SETUP()
+//{
+//	one_time_setup();
+// }
 
+
+int err = false;
 FUZZ_TEST(const uint8_t *data, size_t size)
 {
-
-	mg_set_request_handler(ctx, EXAMPLE_FUZZ, FuzzHandler, 0);
-	int err = false;
-	if (err) {
-		err = false;
+	if (!err) {
+		one_time_setup();
+		err = true;
+	}
+	if (size < 50) {
+		return;
 	}
 
 	FuzzedDataProvider fuzzed_data(data, size);
@@ -348,7 +356,7 @@ FUZZ_TEST(const uint8_t *data, size_t size)
 
 	if (cli == NULL) {
 		fprintf(stderr, "Cannot connect client: %s\n", errbuf);
-		err = true;
+		// err = false;
 		return;
 	}
 
@@ -359,7 +367,7 @@ FUZZ_TEST(const uint8_t *data, size_t size)
 	// ones!
 	mg_printf(cli,
 	          "%s %s?q=%s HTTP/1.1\r\n",
-	          method.c_str(),
+	          "GET", // method.c_str(),
 	          EXAMPLE_FUZZ,
 	          fuzzed_data.ConsumeRemainingBytesAsString().c_str());
 	mg_printf(cli, "Host: %s\r\n", HOST);

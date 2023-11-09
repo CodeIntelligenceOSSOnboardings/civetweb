@@ -689,29 +689,95 @@ set(CPACK_DEBIAN_PACKAGE_DEPENDS "${CPACK_PACKAGE_DEPENDS}")
 # Finalize CPack settings
 include(CPack)
 
-
-
-# Fuzzing target
-# Compile civetweb.c as a separate object file
+# --------- RAW CMake integration -------------------------------------------
 #add_library(civetweb_fuzz_target OBJECT src/civetweb.c)
 #target_include_directories(civetweb_fuzz_target PRIVATE include/)
-#target_compile_definitions(civetweb_fuzz_target PRIVATE NO_SSL MG_EXPERIMENTAL_INTERFACES NO_FILES)
-# NOTE: This below was necessary for the raw cmake integration
+#target_compile_definitions(civetweb_fuzz_target PRIVATE NO_SSL MG_EXPERIMENTAL_INTERFACES USE_IPV6 USE_WEBSOCKET NO_FILES)
 #target_compile_options(civetweb_fuzz_target PRIVATE
+#    -g
 #    -fsanitize=address,fuzzer,undefined
+#    -O0
+#    -ggdb3
+#    -fno-omit-frame-pointer
+#    -fsanitize-address-use-after-scope
+#    -fno-sanitize-recover=undefined
+#)
+#
+## Create the rest_fuzzer executable
+#
+#add_executable(rest_fuzzer
+#    examples/rest/rest_fuzz.cc
+#    examples/rest/cJSON/cJSON.c
+#    examples/rest/cJSON/cJSON_Utils.c
+#    $<TARGET_OBJECTS:civetweb_fuzz_target>  # Include the object file
+#)
+#target_include_directories(rest_fuzzer PRIVATE 
+#                    examples/rest/cJSON
+#                    include/
+# )
+#target_link_libraries(rest_fuzzer ${CIVETWEB_LIBRARIES} -fsanitize=address,fuzzer,undefined)
+#target_compile_definitions(rest_fuzzer PRIVATE NO_SSL MG_EXPERIMENTAL_INTERFACES USE_IPV6 USE_WEBSOCKET NO_FILES)
+#target_compile_options(rest_fuzzer PRIVATE
+#    -g
+#    -fsanitize=address,fuzzer,undefined
+#    -O0
+#    -ggdb3
 #    -fno-omit-frame-pointer
 #    -fsanitize-address-use-after-scope
 #    -fno-sanitize-recover=undefined
 #)
 
-# Create the rest_fuzzer executable
-add_fuzz_test(rest_fuzzer
+
+# ------------------- CIFUZZ INSTRUMENT CIVETWEB ---------------------------------
+add_fuzz_test(rest_fuzzer_full
     examples/rest/rest_fuzz.cc
     examples/rest/cJSON/cJSON.c
     examples/rest/cJSON/cJSON_Utils.c
     src/civetweb.c
 )
 
-target_include_directories(rest_fuzzer PRIVATE examples/rest/cJSON)
-target_include_directories(rest_fuzzer PRIVATE include/)
-target_compile_definitions(rest_fuzzer PRIVATE MG_EXPERIMENTAL_INTERFACES NO_SSL NO_FILES)
+target_include_directories(rest_fuzzer_full PRIVATE 
+                examples/rest/cJSON
+                include/
+)
+target_compile_definitions(rest_fuzzer_full PRIVATE MG_EXPERIMENTAL_INTERFACES NO_SSL NO_FILES)
+
+
+# ---------------CIFUZZ ONLY INSTRUMENT HARNESS ------------------------------------
+set(CIVETWEB_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+set(LIBCIVETWEB_A ${CIVETWEB_SOURCE_DIR}/libcivetweb.a)
+
+# Custom command to build libcivetweb.a
+add_custom_command(
+  OUTPUT ${CIVETWEB_SOURCE_DIR}
+  WORKING_DIRECTORY ${CIVETWEB_SOURCE_DIR}
+  COMMAND make lib WITH_CPP=1 COPT="-DNO_FILES -DMG_EXPERIMENTAL_INTERFACES -DNO_SSL"
+  COMMENT "Building libcivetweb.a"
+)
+
+# Custom target to wrap the custom command
+add_custom_target(civetweb_build ALL
+  DEPENDS ${LIBCIVETWEB_A}
+)
+
+# Define rest_fuzzer target
+add_fuzz_test(rest_fuzzer_partial
+    examples/rest/rest_fuzz.cc
+    examples/rest/cJSON/cJSON.c
+    examples/rest/cJSON/cJSON_Utils.c
+)
+
+# Ensure rest_fuzzer is built after libcivetweb.a
+add_dependencies(rest_fuzzer_partial civetweb_build)
+
+# Link rest_fuzzer against libcivetweb.a
+target_link_libraries(rest_fuzzer_partial PRIVATE ${LIBCIVETWEB_A})
+
+# Include directories for rest_fuzzer
+target_include_directories(rest_fuzzer_partial PRIVATE
+    ${CIVETWEB_SOURCE_DIR}/include
+    ${CIVETWEB_SOURCE_DIR}/examples/rest/cJSON
+)
+
+# Add compile definitions for rest_fuzzer
+target_compile_definitions(rest_fuzzer_partial PRIVATE MG_EXPERIMENTAL_INTERFACES NO_SSL NO_FILES)
