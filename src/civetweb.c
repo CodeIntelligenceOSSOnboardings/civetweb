@@ -9607,21 +9607,21 @@ connect_socket(
 		return 0;
 	}
 
-	if (0 != set_non_blocking_mode(*sock)) {
-		if (error != NULL) {
-			error->code = MG_ERROR_DATA_CODE_OS_ERROR;
-			error->code_sub = (unsigned)ERRNO;
-			mg_snprintf(NULL,
-			            NULL, /* No truncation check for ebuf */
-			            error->text,
-			            error->text_buffer_size,
-			            "Cannot set socket to non-blocking: %s",
-			            strerror(ERRNO));
-		}
-		closesocket(*sock);
-		*sock = INVALID_SOCKET;
-		return 0;
-	}
+	// if (0 != set_non_blocking_mode(*sock)) {
+	// 	if (error != NULL) {
+	// 		error->code = MG_ERROR_DATA_CODE_OS_ERROR;
+	// 		error->code_sub = (unsigned)ERRNO;
+	// 		mg_snprintf(NULL,
+	// 		            NULL, /* No truncation check for ebuf */
+	// 		            error->text,
+	// 		            error->text_buffer_size,
+	// 		            "Cannot set socket to non-blocking: %s",
+	// 		            strerror(ERRNO));
+	// 	}
+	// 	closesocket(*sock);
+	// 	*sock = INVALID_SOCKET;
+	// 	return 0;
+	// }
 
 	set_close_on_exec(*sock, NULL, ctx);
 
